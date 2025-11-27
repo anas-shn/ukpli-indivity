@@ -11,6 +11,7 @@ jobs:
   api-test:
     name: BPS API Tests
     runs-on: [self-hosted, ubuntu]
+    environment: BPS_ENV
 
     steps:
       - name: 📥 Checkout Code
