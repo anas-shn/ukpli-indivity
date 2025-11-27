@@ -5,8 +5,6 @@ on:
     branches: [main, master]
   pull_request:
     branches: [main, master]
-  schedule:
-    - cron: "0 2 * * *"
   workflow_dispatch:
 
 jobs:
@@ -20,157 +18,42 @@ jobs:
 
       - name: 🔍 Verify Environment
         run: |
-          echo "Node version: $(node --version)"
-          echo "npm version: $(npm --version)"
-          echo "Newman version: $(newman --version)"
-          echo "Working directory: $(pwd)"
+          echo "Node: $(node --version)"
+          echo "Newman: $(newman --version)"
+          pwd
           ls -la
 
-      - name: 📦 Setup Test Environment
+      - name: 📦 Create Directories
         run: |
-          mkdir -p reports
-          mkdir -p logs
-          echo "✅ Directories created"
+          mkdir -p reports logs
 
       - name: 🧪 Run Newman Tests
-        id: newman_test
         continue-on-error: true
+        id: newman
         env:
           BPS_API_KEY: ${{ secrets.BPS_API_KEY }}
           BPS_DOMAIN: ${{ secrets.DOMAIN_VALUE }}
         run: |
-          echo "Running Newman tests..."
-
           newman run collections/API_BPS_Complete_with_negative_tests.json \
             --env-var "API_KEY=$BPS_API_KEY" \
             --env-var "DOMAIN_VALUE=$BPS_DOMAIN" \
-            --reporters cli,htmlextra,junit \
-            --reporter-htmlextra-export reports/test-report-${{ github.run_number }}.html \
-            --reporter-htmlextra-title "BPS API Test Report - Run #${{ github.run_number }}" \
-            --reporter-junit-export reports/junit-report-${{ github.run_number }}.xml \
+            --reporters cli,htmlextra \
+            --reporter-htmlextra-export reports/report-${{ github.run_number }}.html \
             --delay-request 500 \
-            --timeout-request 10000 \
-            2>&1 | tee logs/test-log-${{ github.run_number }}.log
+            --timeout-request 10000
 
-          EXIT_CODE=${PIPESTATUS[0]}
-          echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
-
-          if [ $EXIT_CODE -eq 0 ]; then
-            echo "✅ Tests passed!"
-          else
-            echo "❌ Tests failed with exit code: $EXIT_CODE"
-          fi
-
-          exit $EXIT_CODE
-
-      - name: 📊 Check Test Results
-        if: always()
-        run: |
-          echo "Checking generated files..."
-          ls -lh reports/ || echo "No reports directory"
-          ls -lh logs/ || echo "No logs directory"
-
-          if [ -f "reports/test-report-${{ github.run_number }}.html" ]; then
-            echo "✅ HTML report generated"
-            FILE_SIZE=$(du -h "reports/test-report-${{ github.run_number }}.html" | cut -f1)
-            echo "Report size: $FILE_SIZE"
-          else
-            echo "❌ HTML report not found"
-          fi
-
-      - name: 📤 Upload HTML Report
+      - name: 📤 Upload Report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: test-report-${{ github.run_number }}
-          path: |
-            reports/*.html
-            logs/*.log
+          path: reports/*.html
           retention-days: 30
           if-no-files-found: warn
 
-      - name: 📋 Parse Test Results (Simple)
+      - name: 📊 Summary
         if: always()
         run: |
-          echo "## 🧪 Test Results Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-
-          if [ -f "reports/junit-report-${{ github.run_number }}.xml" ]; then
-            # Parse JUnit XML untuk summary
-            TOTAL=$(grep -oP 'tests="\K[^"]+' reports/junit-report-*.xml | head -1)
-            FAILURES=$(grep -oP 'failures="\K[^"]+' reports/junit-report-*.xml | head -1)
-            PASSED=$((TOTAL - FAILURES))
-
-            echo "**Run:** #${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
-            echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "| Metric | Count |" >> $GITHUB_STEP_SUMMARY
-            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
-            echo "| ✅ Passed | $PASSED |" >> $GITHUB_STEP_SUMMARY
-            echo "| ❌ Failed | $FAILURES |" >> $GITHUB_STEP_SUMMARY
-            echo "| 📊 Total | $TOTAL |" >> $GITHUB_STEP_SUMMARY
-
-            if [ $FAILURES -eq 0 ]; then
-              echo "" >> $GITHUB_STEP_SUMMARY
-              echo "🎉 **All tests passed!**" >> $GITHUB_STEP_SUMMARY
-            else
-              echo "" >> $GITHUB_STEP_SUMMARY
-              echo "⚠️ **Some tests failed. Check the report for details.**" >> $GITHUB_STEP_SUMMARY
-            fi
-          else
-            echo "❌ No test results found" >> $GITHUB_STEP_SUMMARY
-          fi
-
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "📥 Download the HTML report from artifacts above for detailed results." >> $GITHUB_STEP_SUMMARY
-
-      - name: 💬 Notify Slack on Failure
-        if: failure() && secrets.SLACK_WEBHOOK != ''
-        run: |
-          REPORT_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-
-          curl -X POST "${{ secrets.SLACK_WEBHOOK }}" \
-            -H 'Content-Type: application/json' \
-            -d "{
-              \"text\": \"🚨 BPS API Tests Failed!\",
-              \"blocks\": [
-                {
-                  \"type\": \"header\",
-                  \"text\": {
-                    \"type\": \"plain_text\",
-                    \"text\": \"❌ API Tests Failed\"
-                  }
-                },
-                {
-                  \"type\": \"section\",
-                  \"fields\": [
-                    {\"type\": \"mrkdwn\", \"text\": \"*Run:*\\n#${{ github.run_number }}\"},
-                    {\"type\": \"mrkdwn\", \"text\": \"*Branch:*\\n${{ github.ref_name }}\"},
-                    {\"type\": \"mrkdwn\", \"text\": \"*Commit:*\\n${{ github.sha }}\"},
-                    {\"type\": \"mrkdwn\", \"text\": \"*Author:*\\n${{ github.actor }}\"}
-                  ]
-                },
-                {
-                  \"type\": \"actions\",
-                  \"elements\": [
-                    {
-                      \"type\": \"button\",
-                      \"text\": {\"type\": \"plain_text\", \"text\": \"View Run\"},
-                      \"url\": \"${REPORT_URL}\"
-                    }
-                  ]
-                }
-              ]
-            }" || echo "⚠️ Slack notification failed (webhook may not be configured)"
-
-      - name: ✅ Job Complete
-        if: always()
-        run: |
-          echo "Job completed with status: ${{ job.status }}"
-          if [ "${{ steps.newman_test.outputs.exit_code }}" == "0" ]; then
-            echo "✅ All tests passed!"
-            exit 0
-          else
-            echo "❌ Some tests failed"
-            exit 1
-          fi
+          echo "## Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "Run #${{ github.run_number }} completed" >> $GITHUB_STEP_SUMMARY
+          echo "Download report from artifacts above" >> $GITHUB_STEP_SUMMARY
