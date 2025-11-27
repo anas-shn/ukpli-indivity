@@ -69,7 +69,7 @@ print_header "Step 3: Checking Collection File"
 
 if [ -d "$RUNNER_WORK_DIR" ]; then
     cd "$RUNNER_WORK_DIR"
-
+    
     if [ -f "collections/API_BPS_Complete_with_negative_tests.json" ]; then
         print_success "Collection file found!"
         FILE_SIZE=$(du -h "collections/API_BPS_Complete_with_negative_tests.json" | cut -f1)
@@ -95,26 +95,26 @@ fi
 # ============================================================
 if [ -f "$RUNNER_WORK_DIR/collections/API_BPS_Complete_with_negative_tests.json" ]; then
     print_header "Step 4: Testing Manual Run"
-
+    
     read -p "Do you want to test Newman manually? (y/n): " -n 1 -r
     echo
-
+    
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         cd "$RUNNER_WORK_DIR"
-
+        
         read -p "Enter BPS_API_KEY: " api_key
         read -p "Enter DOMAIN_VALUE (default 7315): " domain
         domain=${domain:-7315}
-
+        
         mkdir -p reports logs
-
+        
         print_info "Running test..."
         newman run collections/API_BPS_Complete_with_negative_tests.json \
             --env-var "API_KEY=$api_key" \
             --env-var "DOMAIN_VALUE=$domain" \
             --reporters cli \
             --timeout-request 10000
-
+        
         if [ $? -eq 0 ]; then
             print_success "Manual test passed!"
         else
@@ -130,7 +130,7 @@ print_header "Step 5: Checking Runner Service"
 
 if systemctl is-active --quiet actions.runner.*; then
     print_success "Runner service is running"
-
+    
     # Get runner status
     RUNNER_STATUS=$(systemctl status actions.runner.* | grep "Active:" | awk '{print $2}')
     print_info "Status: $RUNNER_STATUS"
