@@ -45,14 +45,14 @@ jobs:
             --iteration-count 1 \
             --timeout-request 10000
 
-      - name: 📤 Upload Report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-report-${{ github.run_number }}
-          path: reports/*.html
-          retention-days: 30
-          if-no-files-found: warn
+      # - name: 📤 Upload Report
+      #   if: always()
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: test-report-${{ github.run_number }}
+      #     path: reports/*.html
+      #     retention-days: 30
+      #     if-no-files-found: warn
 
       - name: 📊 Summary
         if: always()
