@@ -42,7 +42,7 @@ jobs:
             --reporter-htmlextra-export reports/report-${{ github.run_number }}.html \
             --delay-request 500 \
             --suppress-exit-code \
-            --iteration-count 1 \
+            --iteration-count 3 \
             --timeout-request 10000
 
       # - name: 📤 Upload Report
